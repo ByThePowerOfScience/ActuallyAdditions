@@ -181,7 +181,7 @@ public class BlockLaserRelay extends BlockContainerBase implements IHudDisplay {
 
                         Network network = relay.getNetwork();
                         if (network != null) {
-                            network.changeAmount++;
+                            network.incrementChangeAmount();
                         }
 
                         relay.markDirty();

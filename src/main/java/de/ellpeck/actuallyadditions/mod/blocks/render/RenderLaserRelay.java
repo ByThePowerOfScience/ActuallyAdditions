@@ -31,6 +31,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
+import java.util.Set;
+
 @SideOnly(Side.CLIENT)
 public class RenderLaserRelay extends TileEntitySpecialRenderer<TileEntityLaserRelay> {
 
@@ -71,7 +73,7 @@ public class RenderLaserRelay extends TileEntitySpecialRenderer<TileEntityLaserR
                 }
             }
 
-            ConcurrentSet<IConnectionPair> connections = ActuallyAdditionsAPI.connectionHandler.getConnectionsFor(tile.getPos(), tile.getWorld());
+            Set<IConnectionPair> connections = ActuallyAdditionsAPI.connectionHandler.getConnectionsFor(tile.getPos(), tile.getWorld());
             if (connections != null && !connections.isEmpty()) {
                 for (IConnectionPair pair : connections) {
                     if (!pair.doesSuppressRender() && tile.getPos().equals(pair.getPositions()[0])) {

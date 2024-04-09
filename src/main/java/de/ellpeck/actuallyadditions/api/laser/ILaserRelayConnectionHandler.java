@@ -15,6 +15,8 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import java.util.Set;
+
 /**
  * This is the internal laser relay connection handler.
  * Use ActuallyAdditionsAPI.connectionHandler for calling
@@ -25,7 +27,7 @@ import net.minecraft.world.World;
  */
 public interface ILaserRelayConnectionHandler {
 
-    ConcurrentSet<IConnectionPair> getConnectionsFor(BlockPos relay, World world);
+    Set<IConnectionPair> getConnectionsFor(BlockPos relay, World world);
 
     void removeRelayFromNetwork(BlockPos relay, World world);
 

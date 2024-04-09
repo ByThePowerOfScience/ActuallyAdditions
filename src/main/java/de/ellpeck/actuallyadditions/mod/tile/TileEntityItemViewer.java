@@ -167,7 +167,7 @@ public class TileEntityItemViewer extends TileEntityBase {
         if (this.connectedRelay != null) {
             Network network = this.connectedRelay.getNetwork();
             if (network != null) {
-                if (this.lastNetworkChangeAmount != network.changeAmount) {
+                if (this.lastNetworkChangeAmount != network.getChangeAmount()) {
                     this.clearInfos();
 
                     this.connectedRelay.getItemHandlersInNetwork(network, this.genericInfos);
@@ -195,7 +195,7 @@ public class TileEntityItemViewer extends TileEntityBase {
                         }
                         this.slotCount = slotsQueried;
                     }
-                    this.lastNetworkChangeAmount = network.changeAmount;
+                    this.lastNetworkChangeAmount = network.getChangeAmount();
                 }
 
                 return;

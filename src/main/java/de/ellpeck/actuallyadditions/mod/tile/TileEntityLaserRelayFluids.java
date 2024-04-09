@@ -115,7 +115,7 @@ public class TileEntityLaserRelayFluids extends TileEntityLaserRelay {
         if (change || old.size() != this.handlersAround.size()) {
             Network network = this.getNetwork();
             if (network != null) {
-                network.changeAmount++;
+                network.incrementChangeAmount();
             }
         }
     }

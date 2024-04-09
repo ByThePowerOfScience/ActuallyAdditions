@@ -58,7 +58,7 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
         firstNetwork.connections.addAll(secondNetwork.connections);
 
         WorldData data = WorldData.get(world);
-        secondNetwork.changeAmount++;
+        secondNetwork.incrementChangeAmount();
         data.removeNetwork(secondNetwork);
         //System.out.println("Merged Two Networks!");
     }
@@ -86,7 +86,7 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
     public void removeRelayFromNetwork(BlockPos relay, World world) {
         Network network = this.getNetworkFor(relay, world);
         if (network != null) {
-            network.changeAmount++;
+            network.incrementChangeAmount();
 
             //Setup new network (so that splitting a network will cause it to break into two)
             WorldData data = WorldData.get(world);
@@ -185,7 +185,7 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
             Network network = this.getNetworkFor(firstRelay, world);
 
             if (network != null) {
-                network.changeAmount++;
+                network.incrementChangeAmount();
                 
                 WorldData.get(world).removeNetwork(network);
 

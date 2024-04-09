@@ -28,6 +28,8 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraftforge.items.IItemHandler;
 
+import java.util.Set;
+
 public abstract class TileEntityLaserRelay extends TileEntityInventoryBase {
 
     public static final int MAX_DISTANCE = 15;
@@ -69,7 +71,7 @@ public abstract class TileEntityLaserRelay extends TileEntityInventoryBase {
         if (type == NBTType.SYNC) {
             NBTTagList list = new NBTTagList();
 
-            ConcurrentSet<IConnectionPair> connections = ActuallyAdditionsAPI.connectionHandler.getConnectionsFor(this.pos, this.world);
+            Set<IConnectionPair> connections = ActuallyAdditionsAPI.connectionHandler.getConnectionsFor(this.pos, this.world);
             if (connections != null && !connections.isEmpty()) {
                 for (IConnectionPair pair : connections) {
                     NBTTagCompound tag = new NBTTagCompound();
@@ -88,7 +90,7 @@ public abstract class TileEntityLaserRelay extends TileEntityInventoryBase {
 
         int range = this.getMaxRange();
         if (this.lastRange != range) {
-            ConcurrentSet<IConnectionPair> connections = ActuallyAdditionsAPI.connectionHandler.getConnectionsFor(this.pos, this.world);
+            Set<IConnectionPair> connections = ActuallyAdditionsAPI.connectionHandler.getConnectionsFor(this.pos, this.world);
             if (connections != null && !connections.isEmpty()) {
                 for (IConnectionPair pair : connections) {
                     int distanceSq = (int) pair.getPositions()[0].distanceSq(pair.getPositions()[1]);
@@ -135,11 +137,11 @@ public abstract class TileEntityLaserRelay extends TileEntityInventoryBase {
     }*/
 
     public Network getNetwork() {
-        if (this.cachedNetwork == null || this.cachedNetwork.changeAmount != this.changeAmountAtCaching) {
+        if (this.cachedNetwork == null || this.cachedNetwork.getChangeAmount() != this.changeAmountAtCaching) {
             this.cachedNetwork = ActuallyAdditionsAPI.connectionHandler.getNetworkFor(this.pos, this.world);
 
             if (this.cachedNetwork != null) {
-                this.changeAmountAtCaching = this.cachedNetwork.changeAmount;
+                this.changeAmountAtCaching = this.cachedNetwork.getChangeAmount();
             } else {
                 this.changeAmountAtCaching = -1;
             }
