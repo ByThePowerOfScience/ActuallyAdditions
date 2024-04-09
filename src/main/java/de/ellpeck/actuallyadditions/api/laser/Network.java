@@ -10,7 +10,10 @@
 
 package de.ellpeck.actuallyadditions.api.laser;
 
+import de.ellpeck.actuallyadditions.mod.misc.apiimpl.ConnectionPair;
 import io.netty.util.internal.ConcurrentSet;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Set;
@@ -70,5 +73,28 @@ public class Network implements INetwork {
             return false;
         
         return this.getAllConnections().equals(((Network) obj).getAllConnections());
+    }
+    
+    @Override
+    public NBTTagCompound serializeNBT() {
+        NBTTagList list = new NBTTagList();
+        for (IConnectionPair pair : this.connections) {
+            NBTTagCompound tag = new NBTTagCompound();
+            pair.writeToNBT(tag);
+            list.appendTag(tag);
+        }
+        NBTTagCompound compound = new NBTTagCompound();
+        compound.setTag("Network", list);
+        return compound;
+    }
+    
+    @Override
+    public void deserializeNBT(NBTTagCompound nbt) {
+        NBTTagList list = nbt.getTagList("Network", 10);
+        for (int i = 0; i < list.tagCount(); i++) {
+            ConnectionPair pair = new ConnectionPair();
+            pair.readFromNBT(list.getCompoundTagAt(i));
+            this.connections.add(pair);
+        }
     }
 }

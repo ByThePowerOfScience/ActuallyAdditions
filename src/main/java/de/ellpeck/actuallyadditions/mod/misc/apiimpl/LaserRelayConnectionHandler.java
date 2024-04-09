@@ -28,25 +28,12 @@ import java.util.Objects;
 public final class LaserRelayConnectionHandler implements ILaserRelayConnectionHandler {
 
     public static NBTTagCompound writeNetworkToNBT(Network network) {
-        NBTTagList list = new NBTTagList();
-        for (IConnectionPair pair : network.connections) {
-            NBTTagCompound tag = new NBTTagCompound();
-            pair.writeToNBT(tag);
-            list.appendTag(tag);
-        }
-        NBTTagCompound compound = new NBTTagCompound();
-        compound.setTag("Network", list);
-        return compound;
+        return network.serializeNBT();
     }
 
     public static Network readNetworkFromNBT(NBTTagCompound tag) {
-        NBTTagList list = tag.getTagList("Network", 10);
         Network network = new Network();
-        for (int i = 0; i < list.tagCount(); i++) {
-            ConnectionPair pair = new ConnectionPair();
-            pair.readFromNBT(list.getCompoundTagAt(i));
-            network.connections.add(pair);
-        }
+        network.deserializeNBT(tag);
         return network;
     }
 
