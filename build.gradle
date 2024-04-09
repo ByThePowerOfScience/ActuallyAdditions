@@ -33,20 +33,17 @@ minecraft {
 
 repositories {
     maven {
+        url "https://cursemaven.com"
+    }
+    maven {
         url "https://dvs1.progwml6.com/files/maven"
-    }
-    maven {
-        url "https://maven.tehnut.info"
-    }
-    maven {
-        url "https://dl.bintray.com/cyclopsmc/dev/"
     }
 }
 
 dependencies {
-    deobfCompile "mezz.jei:jei_1.12.2:+"
-    deobfCompile "mcp.mobius.waila:Hwyla:1.8+"
-    deobfCompile ("org.cyclops.commoncapabilities:CommonCapabilities:1.12.2-+")
+    deobfCompile("mezz.jei:jei_1.12.2:+")
+    deobfCompile("curse.maven:HWYLA-253449:2568751")
+    deobfCompile("curse.maven:common-capabilities-247007:3053017")
 }
 
 processResources {
