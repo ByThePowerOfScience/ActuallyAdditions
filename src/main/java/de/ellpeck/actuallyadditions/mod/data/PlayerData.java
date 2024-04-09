@@ -12,6 +12,7 @@ package de.ellpeck.actuallyadditions.mod.data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,7 +30,7 @@ public final class PlayerData {
 
     public static PlayerSave getDataFromPlayer(EntityPlayer player) {
         WorldData worldData = WorldData.get(player.getEntityWorld());
-        ConcurrentHashMap<UUID, PlayerSave> data = worldData.playerSaveData;
+        Map<UUID, PlayerSave> data = worldData.playerSaveData;
         UUID id = player.getUniqueID();
 
         if (data.containsKey(id)) {
