@@ -122,4 +122,16 @@ public class WorldData extends WorldSavedData {
 
         return compound;
     }
+    
+    public void removeNetwork(Network network) {
+        this.laserRelayNetworks.remove(network);
+        this.markDirty();
+    }
+    
+    public Network makeNewNetwork() {
+        Network network = new Network();
+        this.laserRelayNetworks.add(network);
+        this.markDirty();
+        return network;
+    }
 }

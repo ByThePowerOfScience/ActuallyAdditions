@@ -12,11 +12,23 @@ package de.ellpeck.actuallyadditions.api.laser;
 
 import io.netty.util.internal.ConcurrentSet;
 
+import java.util.Set;
+
 public class Network {
 
-    public final ConcurrentSet<IConnectionPair> connections = new ConcurrentSet<>();
+    public final Set<IConnectionPair> connections = new ConcurrentSet<>();
     public int changeAmount;
 
+    public void addConnection(IConnectionPair pair) {
+        this.connections.add(pair);
+        this.changeAmount++;
+    }
+    
+    public boolean removeConnection(IConnectionPair pair) {
+        this.changeAmount++;
+        return this.connections.remove(pair);
+    }
+    
     @Override
     public String toString() {
         return this.connections.toString();
