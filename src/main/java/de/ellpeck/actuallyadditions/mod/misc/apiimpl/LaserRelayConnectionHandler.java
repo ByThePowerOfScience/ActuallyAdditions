@@ -17,12 +17,14 @@ import de.ellpeck.actuallyadditions.api.laser.LaserType;
 import de.ellpeck.actuallyadditions.api.laser.Network;
 import de.ellpeck.actuallyadditions.mod.data.WorldData;
 import de.ellpeck.actuallyadditions.mod.tile.TileEntityLaserRelay;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -31,13 +33,13 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
     public static NBTTagCompound writeNetworkToNBT(INetwork network) {
         return network.serializeNBT();
     }
-
+    
     public static INetwork readNetworkFromNBT(NBTTagCompound tag) {
         INetwork network = new Network();
         network.deserializeNBT(tag);
         return network;
     }
-
+    
     /**
      * Merges two laserRelayNetworks together
      * (Actually puts everything from the second network into the first one and removes the second one)
@@ -50,6 +52,10 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
         data.removeNetwork(secondNetwork);
         //System.out.println("Merged Two Networks!");
     }
+    
+    
+    
+    private Map<BlockPos, INetwork> networkLookupMap = new Object2ObjectOpenHashMap<>();
 
     /**
      * Gets all Connections for a Relay
@@ -67,7 +73,6 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
         INetwork networkFor = this.getNetworkFor(relay, world);
         
         Pair<Set<INetwork>, Set<BlockPos>> newNetworksAndIsolatedNodes = networkFor.removeRelay(relay, world);
-        
         
         if (newNetworksAndIsolatedNodes == null)
             return;
@@ -93,11 +98,8 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
      */
     @Override
     public INetwork getNetworkFor(BlockPos relay, World world) {
-        if (world != null) {
-            for (INetwork aNetwork : WorldData.get(world).laserRelayNetworks) {
-                if (aNetwork.containsRelay(relay))
-                    return aNetwork;
-            }
+        if (world != null) { // TODO sync with world data
+            return this.networkLookupMap.get(relay);
         }
         return null;
     }
@@ -171,15 +173,8 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
             INetwork network = this.getNetworkFor(firstRelay, world);
 
             if (network != null) {
-                network.incrementChangeAmount();
-                
-                WorldData.get(world).removeNetwork(network);
-
-                for (IConnectionPair pair : network.getAllConnections()) {
-                    if (!pair.contains(firstRelay) || !pair.contains(secondRelay)) {
-                        this.addConnection(pair.getPositions()[0], pair.getPositions()[1], pair.getType(), world, pair.doesSuppressRender());
-                    }
-                }
+                network.removeConnection(firstRelay, secondRelay, world);
+                WorldData.get(world).markDirty();
             }
         }
     }
@@ -197,5 +192,4 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
     public LaserType getTypeFromLaser(BlockPos pos, World world) {
         return this.getTypeFromLaser(world.getTileEntity(pos));
     }
-
 }

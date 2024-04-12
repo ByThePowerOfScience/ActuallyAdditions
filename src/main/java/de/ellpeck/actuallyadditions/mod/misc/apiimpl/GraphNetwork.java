@@ -72,23 +72,41 @@ public class GraphNetwork implements INetwork {
 		incrementChangeAmount();
 	}
 	
+	@Nullable
 	@Override
-	public Pair<Set<INetwork>, Set<BlockPos>> removeConnection(IConnectionPair pair, World unused) {
+	public Pair<Set<INetwork>, Set<BlockPos>> removeConnection(IConnectionPair pair, World world) {
 		BlockPos[] positions = pair.getPositions();
-		
-		Node[] nodes = new Node[positions.length];
-		
-		for (int i = 0; i < positions.length; i++) {
-			nodes[i] = getNodeFor(positions[i]);
+		if (positions.length == 2) {
+			return removeConnection(positions[0], positions[1], world);
+		} else {
+			Pair<Set<INetwork>, Set<BlockPos>> returnValue = Pair.of(new ObjectOpenHashSet<>(), new ObjectOpenHashSet<>());
+			for (int i = 0; i < positions.length; i++) {
+				for (int j = i + 1; j < positions.length; j++) {
+					Pair<Set<INetwork>, Set<BlockPos>> fromRemove = removeConnection(positions[i], positions[j], world);
+					if (fromRemove == null)
+						continue;
+					
+					returnValue.getLeft().addAll(fromRemove.getLeft());
+					returnValue.getRight().addAll(fromRemove.getRight());
+				}
+			}
+			return returnValue;
 		}
+	}
+	
+	@Override
+	public Pair<Set<INetwork>, Set<BlockPos>> removeConnection(BlockPos first, BlockPos second, World world) {
 		
-		Pair<Set<INetwork>, Set<BlockPos>> pairthing = Pair.of(new ObjectOpenHashSet<>(1), new ObjectOpenHashSet<>(2));
-		removeConnection(nodes[0], nodes[1], pairthing); // TODO make this dynamic
+		Pair<Set<INetwork>, Set<BlockPos>> holder = Pair.of(new ObjectOpenHashSet<>(1), new ObjectOpenHashSet<>(2));
+		removeConnection(getNodeFor(first), getNodeFor(second), holder); // TODO make this dynamic
 		
-		return pairthing;
+		return holder;
 	}
 	
 	private void removeConnection(Node n1, Node n2, Pair<Set<INetwork>, Set<BlockPos>> newNetworks_IsolatedNodes) {
+		if (n1 == null || n2 == null || n1.equals(n2))
+			return;
+		
 		// delete the nodes' references to one another
 		Node.deleteTwoWayConnection(n1, n2);
 		
@@ -151,7 +169,7 @@ public class GraphNetwork implements INetwork {
 	@Override
 	public void absorbNetwork(INetwork other) {
 		if (other instanceof GraphNetwork) {
-			((GraphNetwork) other).nodeLookupMap.values().forEach(node -> node.network = this);
+			((GraphNetwork) other).forEach(node -> node.network = this);
 			this.nodeLookupMap.putAll(((GraphNetwork) other).nodeLookupMap);
 		} else {
 			other.getAllConnections().forEach(this::addConnection);
@@ -178,8 +196,6 @@ public class GraphNetwork implements INetwork {
 	public boolean containsRelay(BlockPos pos) {
 		return nodeLookupMap.containsKey(pos);
 	}
-	
-	
 	
 	@Nullable
 	public Node getNodeFor(BlockPos pos) {
