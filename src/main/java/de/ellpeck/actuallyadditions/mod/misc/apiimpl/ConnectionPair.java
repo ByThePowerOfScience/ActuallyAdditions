@@ -15,6 +15,9 @@ import de.ellpeck.actuallyadditions.api.laser.LaserType;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public class ConnectionPair implements IConnectionPair {
 
     private final BlockPos[] positions = new BlockPos[2];
@@ -28,6 +31,7 @@ public class ConnectionPair implements IConnectionPair {
     public ConnectionPair(BlockPos firstRelay, BlockPos secondRelay, LaserType type, boolean suppressConnectionRender) {
         this.positions[0] = firstRelay;
         this.positions[1] = secondRelay;
+        Arrays.sort(this.positions);
         this.suppressConnectionRender = suppressConnectionRender;
         this.type = type;
     }
@@ -44,7 +48,7 @@ public class ConnectionPair implements IConnectionPair {
             this.suppressConnectionRender = compound.getBoolean("SuppressRender");
 
             String typeStrg = compound.getString("Type");
-            if (typeStrg != null && !typeStrg.isEmpty()) {
+            if (!typeStrg.isEmpty()) {
                 this.type = LaserType.valueOf(typeStrg);
             }
         }
@@ -67,15 +71,19 @@ public class ConnectionPair implements IConnectionPair {
 
     @Override
     public boolean contains(BlockPos relay) {
-        for (BlockPos position : this.positions) {
-            if (position != null && position.equals(relay)) { return true; }
+        for (int i = 0; i < this.positions.length; i++) {
+            if (positions[i] != null && positions[i].equals(relay)) {
+                return true;
+            }
         }
         return false;
     }
 
     @Override
     public String toString() {
-        return (this.positions[0] == null ? "-" : this.positions[0].toString()) + " | " + (this.positions[1] == null ? "-" : this.positions[1].toString());
+        return (this.positions[0] == null ? "-" : this.positions[0].toString())
+               + " | "
+               + (this.positions[1] == null ? "-" : this.positions[1].toString());
     }
 
     @Override
@@ -91,15 +99,44 @@ public class ConnectionPair implements IConnectionPair {
         }
         compound.setBoolean("SuppressRender", this.suppressConnectionRender);
     }
-
+    
     @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof ConnectionPair) {
-            ConnectionPair pair = (ConnectionPair) obj;
-            for (int i = 0; i < this.positions.length; i++) {
-                if (this.positions[i] == pair.positions[i] || this.positions[i] != null && this.positions[i].equals(pair.positions[i])) { return true; }
+    public NBTTagCompound serializeNBT() {
+        NBTTagCompound compound = new NBTTagCompound();
+        this.writeToNBT(compound);
+        return compound;
+    }
+    
+    @Override
+    public void deserializeNBT(NBTTagCompound nbt) {
+        this.readFromNBT(nbt);
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof ConnectionPair))
+            return false;
+        
+        ConnectionPair that = (ConnectionPair) o;
+        return this.suppressConnectionRender == that.suppressConnectionRender
+               && Arrays.equals(this.positions, that.positions)
+               && this.type == that.type;
+    }
+    
+    private int hashcode = -1;
+    
+    @Override
+    public int hashCode() {
+        if (hashcode == -1) {
+            hashcode = 0;
+            for (int i = 0; i < this.positions.length; i++) { // order-independent hashcode
+                hashcode += positions[i].hashCode();
             }
+            hashcode = Objects.hash(this.hashcode, this.type, this.suppressConnectionRender);
         }
-        return super.equals(obj);
+        
+        return hashcode;
     }
 }
