@@ -11,6 +11,7 @@
 package de.ellpeck.actuallyadditions.mod.blocks;
 
 import de.ellpeck.actuallyadditions.api.ActuallyAdditionsAPI;
+import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import de.ellpeck.actuallyadditions.api.laser.Network;
 import de.ellpeck.actuallyadditions.mod.ActuallyAdditions;
 import de.ellpeck.actuallyadditions.mod.blocks.base.BlockContainerBase;
@@ -179,7 +180,7 @@ public class BlockLaserRelay extends BlockContainerBase implements IHudDisplay {
                     if (!world.isRemote) {
                         relay.onCompassAction(player);
 
-                        Network network = relay.getNetwork();
+                        INetwork network = relay.getNetwork();
                         if (network != null) {
                             network.incrementChangeAmount();
                         }

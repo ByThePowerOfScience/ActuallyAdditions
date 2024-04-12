@@ -10,7 +10,6 @@
 
 package de.ellpeck.actuallyadditions.api.laser;
 
-import io.netty.util.internal.ConcurrentSet;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -31,7 +30,7 @@ public interface ILaserRelayConnectionHandler {
 
     void removeRelayFromNetwork(BlockPos relay, World world);
 
-    Network getNetworkFor(BlockPos relay, World world);
+    INetwork getNetworkFor(BlockPos relay, World world);
 
     boolean addConnection(BlockPos firstRelay, BlockPos secondRelay, LaserType type, World world);
 
@@ -40,6 +39,8 @@ public interface ILaserRelayConnectionHandler {
     boolean addConnection(BlockPos firstRelay, BlockPos secondRelay, LaserType type, World world, boolean suppressConnectionRender, boolean removeIfConnected);
 
     void removeConnection(World world, BlockPos firstRelay, BlockPos secondRelay);
+    
+    void removeNetwork(INetwork network, World world);
 
     LaserType getTypeFromLaser(TileEntity tile);
 

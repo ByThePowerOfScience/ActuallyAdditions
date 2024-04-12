@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import org.cyclops.commoncapabilities.capability.itemhandler.SlotlessItemHandlerConfig;
 
 import de.ellpeck.actuallyadditions.api.laser.IConnectionPair;
@@ -103,18 +104,18 @@ public class TileEntityLaserRelayItem extends TileEntityLaserRelay {
         }
 
         if (change || old.size() != this.handlersAround.size()) {
-            Network network = this.getNetwork();
+            INetwork network = this.getNetwork();
             if (network != null) {
                 network.incrementChangeAmount();
             }
         }
     }
 
-    public void getItemHandlersInNetwork(Network network, List<GenericItemHandlerInfo> storeList) {
+    public void getItemHandlersInNetwork(INetwork network, List<GenericItemHandlerInfo> storeList) {
         //Keeps track of all the Laser Relays and Item Handlers that have been checked already to make nothing run multiple times
         Set<BlockPos> alreadyChecked = new HashSet<>();
 
-        for (IConnectionPair pair : network.connections) {
+        for (IConnectionPair pair : network.getAllConnections()) {
             for (BlockPos relay : pair.getPositions()) {
                 if (relay != null && this.world.isBlockLoaded(relay) && !alreadyChecked.contains(relay)) {
                     alreadyChecked.add(relay);

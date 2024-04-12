@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import de.ellpeck.actuallyadditions.api.laser.IConnectionPair;
+import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import de.ellpeck.actuallyadditions.api.laser.LaserType;
 import de.ellpeck.actuallyadditions.api.laser.Network;
 import de.ellpeck.actuallyadditions.mod.ActuallyAdditions;
@@ -113,7 +114,7 @@ public class TileEntityLaserRelayFluids extends TileEntityLaserRelay {
         }
 
         if (change || old.size() != this.handlersAround.size()) {
-            Network network = this.getNetwork();
+            INetwork network = this.getNetwork();
             if (network != null) {
                 network.incrementChangeAmount();
             }
@@ -128,7 +129,7 @@ public class TileEntityLaserRelayFluids extends TileEntityLaserRelay {
     private int transmitFluid(EnumFacing from, FluidStack stack, boolean doFill) {
         int transmitted = 0;
         if (stack != null && this.mode != Mode.OUTPUT_ONLY) {
-            Network network = this.getNetwork();
+            INetwork network = this.getNetwork();
             if (network != null) {
                 transmitted = this.transferFluidToReceiverInNeed(from, network, stack, doFill);
             }
@@ -136,7 +137,7 @@ public class TileEntityLaserRelayFluids extends TileEntityLaserRelay {
         return transmitted;
     }
 
-    private int transferFluidToReceiverInNeed(EnumFacing from, Network network, FluidStack stack, boolean doFill) {
+    private int transferFluidToReceiverInNeed(EnumFacing from, INetwork network, FluidStack stack, boolean doFill) {
         int transmitted = 0;
         //Keeps track of all the Laser Relays and Energy Acceptors that have been checked already to make nothing run multiple times
         Set<BlockPos> alreadyChecked = new HashSet<>();
@@ -144,7 +145,7 @@ public class TileEntityLaserRelayFluids extends TileEntityLaserRelay {
         Set<TileEntityLaserRelayFluids> relaysThatWork = new HashSet<>();
         int totalReceiverAmount = 0;
 
-        for (IConnectionPair pair : network.connections) {
+        for (IConnectionPair pair : network.getAllConnections()) {
             for (BlockPos relay : pair.getPositions()) {
                 if (relay != null && this.world.isBlockLoaded(relay) && !alreadyChecked.contains(relay)) {
                     alreadyChecked.add(relay);

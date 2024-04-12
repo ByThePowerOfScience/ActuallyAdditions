@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import org.cyclops.commoncapabilities.api.capability.itemhandler.ISlotlessItemHandler;
 import org.cyclops.commoncapabilities.capability.itemhandler.SlotlessItemHandlerConfig;
 
@@ -165,7 +166,7 @@ public class TileEntityItemViewer extends TileEntityBase {
 
     private void queryAndSaveData() {
         if (this.connectedRelay != null) {
-            Network network = this.connectedRelay.getNetwork();
+            INetwork network = this.connectedRelay.getNetwork();
             if (network != null) {
                 if (this.lastNetworkChangeAmount != network.getChangeAmount()) {
                     this.clearInfos();

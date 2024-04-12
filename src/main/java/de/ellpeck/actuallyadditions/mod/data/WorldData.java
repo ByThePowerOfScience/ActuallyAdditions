@@ -10,14 +10,17 @@
 
 package de.ellpeck.actuallyadditions.mod.data;
 
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import de.ellpeck.actuallyadditions.api.laser.Network;
 import de.ellpeck.actuallyadditions.mod.ActuallyAdditions;
 import de.ellpeck.actuallyadditions.mod.data.PlayerData.PlayerSave;
 import de.ellpeck.actuallyadditions.mod.misc.apiimpl.LaserRelayConnectionHandler;
 import io.netty.util.internal.ConcurrentSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.World;
@@ -27,7 +30,7 @@ public class WorldData extends WorldSavedData {
 
     public static final String DATA_TAG = ActuallyAdditions.MODID + "data";
     private static WorldData data;
-    public final ConcurrentSet<Network> laserRelayNetworks = new ConcurrentSet<>();
+    public final Set<INetwork> laserRelayNetworks = new ObjectOpenHashSet<>();
     public final ConcurrentHashMap<UUID, PlayerSave> playerSaveData = new ConcurrentHashMap<>();
 
     public WorldData(String name) {
@@ -79,7 +82,7 @@ public class WorldData extends WorldSavedData {
         this.laserRelayNetworks.clear();
         NBTTagList networkList = compound.getTagList("Networks", 10);
         for (int i = 0; i < networkList.tagCount(); i++) {
-            Network network = LaserRelayConnectionHandler.readNetworkFromNBT(networkList.getCompoundTagAt(i));
+            INetwork network = LaserRelayConnectionHandler.readNetworkFromNBT(networkList.getCompoundTagAt(i));
             this.laserRelayNetworks.add(network);
         }
 
@@ -101,7 +104,7 @@ public class WorldData extends WorldSavedData {
     public NBTTagCompound writeToNBT(NBTTagCompound compound) {
         //Laser World Data
         NBTTagList networkList = new NBTTagList();
-        for (Network network : this.laserRelayNetworks) {
+        for (INetwork network : this.laserRelayNetworks) {
             networkList.appendTag(LaserRelayConnectionHandler.writeNetworkToNBT(network));
         }
         compound.setTag("Networks", networkList);
@@ -123,15 +126,13 @@ public class WorldData extends WorldSavedData {
         return compound;
     }
     
-    public void removeNetwork(Network network) {
+    public void removeNetwork(INetwork network) {
         this.laserRelayNetworks.remove(network);
         this.markDirty();
     }
     
-    public Network makeNewNetwork() {
-        Network network = new Network();
+    public void registerNetwork(INetwork network) {
         this.laserRelayNetworks.add(network);
         this.markDirty();
-        return network;
     }
 }

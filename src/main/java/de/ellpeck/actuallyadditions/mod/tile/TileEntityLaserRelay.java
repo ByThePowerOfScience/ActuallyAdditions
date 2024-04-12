@@ -12,6 +12,7 @@ package de.ellpeck.actuallyadditions.mod.tile;
 
 import de.ellpeck.actuallyadditions.api.ActuallyAdditionsAPI;
 import de.ellpeck.actuallyadditions.api.laser.IConnectionPair;
+import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import de.ellpeck.actuallyadditions.api.laser.LaserType;
 import de.ellpeck.actuallyadditions.api.laser.Network;
 import de.ellpeck.actuallyadditions.mod.items.InitItems;
@@ -37,7 +38,7 @@ public abstract class TileEntityLaserRelay extends TileEntityInventoryBase {
 
     public final LaserType type;
 
-    private Network cachedNetwork;
+    private INetwork cachedNetwork;
     private int changeAmountAtCaching = -1;
     private int lastRange;
 
@@ -136,7 +137,7 @@ public abstract class TileEntityLaserRelay extends TileEntityInventoryBase {
         }
     }*/
 
-    public Network getNetwork() {
+    public INetwork getNetwork() {
         if (this.cachedNetwork == null || this.cachedNetwork.getChangeAmount() != this.changeAmountAtCaching) {
             this.cachedNetwork = ActuallyAdditionsAPI.connectionHandler.getNetworkFor(this.pos, this.world);
 

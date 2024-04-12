@@ -1,63 +1,161 @@
 package de.ellpeck.actuallyadditions.mod.misc.apiimpl;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSet.Builder;
 import de.ellpeck.actuallyadditions.api.laser.IConnectionPair;
 import de.ellpeck.actuallyadditions.api.laser.INetwork;
 import de.ellpeck.actuallyadditions.api.laser.LaserType;
-import io.netty.util.internal.ConcurrentSet;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
+import net.minecraftforge.common.util.INBTSerializable;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class GraphNetwork implements INetwork {
+	
+	public Map<BlockPos, Node> nodeLookupMap;
+	
 	private AtomicInteger changeAmount = new AtomicInteger(0);
 	
+	public static int debug$idCount = 0;
+	public final int id;
+	
+	public GraphNetwork() {
+		this.nodeLookupMap = Collections.synchronizedMap(new Object2ObjectOpenHashMap<>());
+		this.id = debug$idCount++;
+	}
+	
+	
 	/**
-	 * Quick reverse lookup to get a BlockPos' representation in the graph.
-	 * ?Could maybe use an {IntMap : Int2ObjectMap} for x and y coords to save memory? probably doesn't matter but whatever
+	 * Gets nodes representing the positions in the connection pair, or create them if they are absent.  Uses a Set instead of a Tuple since the API technically allows for 3+ nodes to exist in a pair.
+	 * @param pair The connection pair containing the positions to get nodes for.
+	 * @return Set containing the distinct nodes in the pair.
 	 */
-	public Map<BlockPos, Node> nodeLookupMap;
+	@Nonnull
+	public Set<Node> getOrMakeNodesForConnectionPair(IConnectionPair pair) {
+		Builder<Node> ret = ImmutableSet.builder();
+		
+		BlockPos[] positions = pair.getPositions();
+		
+		for (int i = 0; i < positions.length; i++) {
+			ret.add(nodeLookupMap.computeIfAbsent(positions[i], pos -> new Node(pos, pair.getType())));
+		}
+		
+		return ret.build();
+	}
 	
 	
 	@Override
 	public void addConnection(IConnectionPair pair) {
-		BlockPos[] positions = pair.getPositions();
+		Set<Node> nodes = getOrMakeNodesForConnectionPair(pair);
 		
-		Function<BlockPos, Node> mapper = pos -> new Node(pos, pair.getType());
-		
-		Node first = nodeLookupMap.computeIfAbsent(positions[0], mapper);
-		Node second = nodeLookupMap.computeIfAbsent(positions[1], mapper);
-		
-		if (Objects.equals(first, second))
+		if (nodes.size() <= 1) // if all match
 			return;
 		
-		
+		connectNodes(nodes);
+		incrementChangeAmount();
 	}
 	
 	@Override
-	public boolean removeConnection(IConnectionPair pair) {
-		return false;
+	public Pair<Set<INetwork>, Set<BlockPos>> removeConnection(IConnectionPair pair, World unused) {
+		BlockPos[] positions = pair.getPositions();
+		
+		Node[] nodes = new Node[positions.length];
+		
+		for (int i = 0; i < positions.length; i++) {
+			nodes[i] = getNodeFor(positions[i]);
+		}
+		
+		Pair<Set<INetwork>, Set<BlockPos>> pairthing = Pair.of(new ObjectOpenHashSet<>(1), new ObjectOpenHashSet<>(2));
+		removeConnection(nodes[0], nodes[1], pairthing); // TODO make this dynamic
+		
+		return pairthing;
+	}
+	
+	private void removeConnection(Node n1, Node n2, Pair<Set<INetwork>, Set<BlockPos>> newNetworks_IsolatedNodes) {
+		// delete the nodes' references to one another
+		Node.deleteTwoWayConnection(n1, n2);
+		
+		boolean firstWasEmpty = false;
+		boolean secondWasEmpty = false;
+		if (n1.connections.isEmpty()) {
+			// we've isolated this node: need to remove its network reference
+			nodeLookupMap.remove(n1.pos);
+			newNetworks_IsolatedNodes.getRight().add(n1.pos);
+			firstWasEmpty = true;
+		}
+		if (n2.connections.isEmpty()) {
+			nodeLookupMap.remove(n2.pos);
+			newNetworks_IsolatedNodes.getRight().add(n2.pos);
+			secondWasEmpty = true;
+		}
+		// if one was isolated, that means we can leave anything on the other branch in this network and don't have to create another one
+		if (firstWasEmpty || secondWasEmpty)
+			return;
+		
+		GraphNetwork newNetwork = new GraphNetwork();
+		traverseFromNode(n2, node -> newNetwork.nodeLookupMap.put(node.pos, node));
+		newNetworks_IsolatedNodes.getLeft().add(newNetwork);
+	}
+	
+	@Override
+	public Pair<Set<INetwork>, Set<BlockPos>> removeRelay(BlockPos pos, World world) {
+		Node removed = nodeLookupMap.remove(pos);
+		if (removed == null)
+			return null;
+		
+		final Pair<Set<INetwork>, Set<BlockPos>> newNetworks_isolatedNodes = Pair.of(new ObjectOpenHashSet<>(), new ObjectOpenHashSet<>());
+		removed.connections.forEach(connectedNode -> removeConnection(removed, connectedNode, newNetworks_isolatedNodes));
+		
+		return newNetworks_isolatedNodes;
 	}
 	
 	@Override
 	public Set<IConnectionPair> getAllConnections() {
-		return null;
+		Optional<Node> arbitraryNode = nodeLookupMap.values().stream().findFirst();
+		if (!arbitraryNode.isPresent())
+			return ImmutableSet.of();
+		
+		Set<IConnectionPair> ret = new ObjectOpenHashSet<>(nodeLookupMap.size());
+		
+		traverseFromNode(arbitraryNode.get(), (n1, n2) -> ret.add(n1.makeConnectionPairWith(n2)));
+		
+		return ret;
 	}
 	
 	@Override
 	public Set<IConnectionPair> getConnectionsFor(BlockPos pos) {
-		return null;
+		Node node = nodeLookupMap.get(pos);
+		if (node == null)
+			return null;
+		
+		return node.getConnectionsAsPairs();
+	}
+	
+	@Override
+	public void absorbNetwork(INetwork other) {
+		if (other instanceof GraphNetwork) {
+			((GraphNetwork) other).nodeLookupMap.values().forEach(node -> node.network = this);
+			this.nodeLookupMap.putAll(((GraphNetwork) other).nodeLookupMap);
+		} else {
+			other.getAllConnections().forEach(this::addConnection);
+		}
 	}
 	
 	@Override
@@ -70,63 +168,90 @@ public class GraphNetwork implements INetwork {
 		changeAmount.incrementAndGet();
 	}
 	
-	public static int debug$idCount = 0;
-	public final int id;
-	
-	public GraphNetwork() {
-		nodeLookupMap = new ConcurrentHashMap<>();
-		this.id = debug$idCount++;
-	}
-	
-	public int getNodeCount() {
+	/**
+	 * Get the number of relays in this network.
+	 */
+	public int size() {
 		return nodeLookupMap.size();
 	}
 	
-	public Node removeNode(BlockPos pos) {
-		return nodeLookupMap.remove(pos);
+	public boolean containsRelay(BlockPos pos) {
+		return nodeLookupMap.containsKey(pos);
 	}
 	
+	
+	
+	@Nullable
 	public Node getNodeFor(BlockPos pos) {
+		if (pos == null)
+			return null;
 		return nodeLookupMap.get(pos);
 	}
 	
-	/**
-	 * Adds all of this network's endpoints and nodes to the other network and clears all of this network's trackers.
-	 * @param otherNetwork The network to join.
-	 */
-	public void mergeIntoOtherNetwork(GraphNetwork otherNetwork) {
-		// update every node's internal network reference
-		forEach(node -> node.network = otherNetwork);
-		otherNetwork.nodeLookupMap.putAll(this.nodeLookupMap);
-		this.nodeLookupMap.clear();
-	}
 	
 	/**
-	 * Performs an action on every node in the graph. Used in {@link #mergeIntoOtherNetwork} to set every node's network reference to the new network.
-	 * @param action The action to
+	 * Performs an action on every node in the graph. Used in {@link #absorbNetwork(de.ellpeck.actuallyadditions.api.laser.INetwork)} to set every node's network reference to the new network.
+	 * @param action The action to perform.
 	 */
 	public void forEach(Consumer<Node> action) {
 		if (action == null || nodeLookupMap.isEmpty()) {
 			return;
 		}
 		
-		
-	}
-	
-	public void traverseFromNode(Node currentNode, Consumer<Node> action) {
-		Set<Node> alreadyTraversed = new HashSet<>(this.nodeLookupMap.size());
-		
-		forEachNodeRecursive(currentNode, action, alreadyTraversed);
+		nodeLookupMap.values().forEach(action);
 	}
 	
 	/**
-	 * Put logic in another method because I don't want the recursive logic inside my forEach method.
-	 * ...I could probably just put it inside a class to avoid pushing everything onto the stack...
+	 * Performs the given action on every node on the same branch as the given node.  A pre-order traversal of the graph.
+	 * @param start The node to start at.
+	 * @param action The action to perform on every node.
+	 */
+	public final void traverseFromNode(Node start, Consumer<Node> action) {
+		traverseFromNode(start, action, size());
+	}
+	
+	/**
+	 * Performs the given action on every node on the same branch as the given node.  A pre-order traversal of the graph.
+	 * @param start The node to start at.
+	 * @param action The action to perform on every node.
+	 */
+	public static void traverseFromNode(Node start, Consumer<Node> action, int expectedSize) {
+		Set<Node> alreadyTraversed = new ObjectOpenHashSet<>(expectedSize);
+		
+		forEachNodeRecursive(start, action, alreadyTraversed);
+	}
+	
+	/**
+	 * Performs the given action on every edge on the same branch as the given node.  A pre-order traversal of the graph.
+	 * @param start The node to start at.
+	 * @param action The action to perform on every connection between nodes.
+	 */
+	public final void traverseFromNode(Node start, BiConsumer<Node, Node> action) {
+		traverseFromNode(start, action, size());
+	}
+	
+	/**
+	 * Performs the given action on every edge on the same branch as the given node.  A pre-order traversal of the graph.
+	 * @param start The node to start at.
+	 * @param action The action to perform on every connection between nodes.
+	 */
+	public static void traverseFromNode(Node start, BiConsumer<Node, Node> action, int expectedSize) {
+		Set<Node> alreadyTraversed = new ObjectOpenHashSet<>(expectedSize);
+		
+		forEachEdgeRecursive(start, action, alreadyTraversed);
+	}
+	
+	
+	
+	
+	/**
+	 * Traverse through the graph by connected edges starting from the given node.  Recursive.
+	 *
 	 * @param currentNode The current node being checked.
 	 * @param action The action to perform on every node.
 	 * @param alreadyChecked Set of nodes we've already looked at. Pass in a {@code new HashSet<>()} or something sized to the expected number of nodes you'll encounter.
 	 */
-	public static void forEachNodeRecursive(Node currentNode, Consumer<Node> action, Set<Node> alreadyChecked) {
+	private static void forEachNodeRecursive(Node currentNode, Consumer<Node> action, Set<Node> alreadyChecked) {
 		action.accept(currentNode);
 		alreadyChecked.add(currentNode);
 		
@@ -137,7 +262,14 @@ public class GraphNetwork implements INetwork {
 		}
 	}
 	
-	public static void forEachEdgeRecursive(Node currentNode, BiConsumer<Node, Node> action, Set<Node> alreadyChecked) {
+	/**
+	 * Traverse through the graph by connected edges starting from the given node.  Recursive.
+	 *
+	 * @param currentNode The current node being checked.
+	 * @param action The action to perform on every node.
+	 * @param alreadyChecked Set of nodes we've already looked at. Pass in a {@code new HashSet<>()} or something sized to the expected number of nodes you'll encounter.
+	 */
+	private static void forEachEdgeRecursive(Node currentNode, BiConsumer<Node, Node> action, Set<Node> alreadyChecked) {
 		alreadyChecked.add(currentNode);
 		for (Node connectedNode : currentNode.connections) {
 			if (!alreadyChecked.contains(connectedNode)) {
@@ -147,15 +279,14 @@ public class GraphNetwork implements INetwork {
 		}
 	}
 	
+	
 	@Override
 	public NBTTagCompound serializeNBT() {
 		NBTTagList list = new NBTTagList();
 		
-		forEachEdgeRecursive(this.nodeLookupMap.values().iterator().next(), (source, dest) -> {
-			NBTTagCompound tag = new NBTTagCompound();
-			source.makeConnectionPairWith(dest).writeToNBT(tag);
-			list.appendTag(tag);
-		}, new HashSet<>(this.nodeLookupMap.size()));
+		getAllConnections().stream()
+		                   .map(INBTSerializable::serializeNBT)
+		                   .forEach(list::appendTag);
 		
 		NBTTagCompound compound = new NBTTagCompound();
 		compound.setTag("Network", list);
@@ -164,35 +295,38 @@ public class GraphNetwork implements INetwork {
 	
 	@Override
 	public void deserializeNBT(NBTTagCompound tag) {
+		this.nodeLookupMap.clear();
+		
 		NBTTagList list = tag.getTagList("Network", 10);
 		for (int i = 0; i < list.tagCount(); i++) {
 			ConnectionPair pair = new ConnectionPair();
 			pair.readFromNBT(list.getCompoundTagAt(i));
-			BlockPos[] positions = pair.getPositions();
-			
-			// no reason to generate two classes for the same thing, shrug
-			Function<BlockPos, Node> nodeGenerator = (k) -> new Node(k, pair.getType());
-			Node first = this.nodeLookupMap.computeIfAbsent(positions[0], nodeGenerator);
-			Node second = this.nodeLookupMap.computeIfAbsent(positions[1], nodeGenerator);
-			
-			connectNodes(first, second);
+			addConnection(pair);
 		}
 	}
 	
 	/**
-	 * Makes a two-way connection between two nodes.
+	 * Connects all given nodes to each other.
 	 */
-	public static void connectNodes(Node first, Node second) {
-		if (Objects.equals(first, second))
+	public static void connectNodes(Set<Node> nodes) {
+		if (nodes.size() <= 1) {
 			return;
-		first.connections.add(second);
-		second.connections.add(first);
+		}
+		
+		Node[] arr = nodes.toArray(new Node[0]);
+		if (arr.length == 2) {
+			Node.formTwoWayConnection(arr[0], arr[1]);
+		} else {
+			// do the thing for every node pair
+			for (int i = 0; i < arr.length; i++) {
+				for (int j = i + 1; j < arr.length; j++) {
+					Node.formTwoWayConnection(arr[i], arr[j]);
+				}
+			}
+		}
+		
 	}
 	
-	public static void disconnectNodes(Node first, Node second) {
-		first.connections.remove(second);
-		second.connections.remove(first);
-	}
 	
 	@Override
 	public boolean equals(Object o) {
@@ -222,9 +356,7 @@ public class GraphNetwork implements INetwork {
 			                    s += "::{";
 			                    s += node.connections
 					                    .stream()
-					                    .map(connected -> {
-						                    return String.format("(%d %d %d)", connected.pos.getX(), connected.pos.getY(), connected.pos.getZ());
-					                    })
+					                    .map(connected -> String.format("(%d %d %d)", connected.pos.getX(), connected.pos.getY(), connected.pos.getZ()))
 					                    .collect(Collectors.joining(", "));
 			                    s += "}";
 			                    return s;
@@ -264,6 +396,22 @@ public class GraphNetwork implements INetwork {
 			this.type = type;
 		}
 		
+		public static void formTwoWayConnection(Node first, Node second) {
+			if (Objects.equals(first, second))
+				return;
+			
+			first.connections.add(second);
+			second.connections.add(first);
+		}
+		
+		/**
+		 * Removes the two-way connection between the provided nodes.
+		 * @return true if the nodes were connected, false otherwise.
+		 */
+		public static boolean deleteTwoWayConnection(@Nonnull Node first, @Nonnull Node second) {
+			boolean wasPresent = first.connections.remove(second);
+			return second.connections.remove(first) && wasPresent;
+		}
 		
 		
 		@Nonnull
@@ -279,8 +427,8 @@ public class GraphNetwork implements INetwork {
 			);
 		}
 		
-		public ConcurrentSet<IConnectionPair> getConnectionsAsPairs() {
-			ConcurrentSet<IConnectionPair> ret = new ConcurrentSet<>();
+		public Set<IConnectionPair> getConnectionsAsPairs() {
+			Set<IConnectionPair> ret = new ObjectOpenHashSet<>();
 			this.connections.forEach(node -> ret.add(this.makeConnectionPairWith(node)));
 			return ret;
 		}

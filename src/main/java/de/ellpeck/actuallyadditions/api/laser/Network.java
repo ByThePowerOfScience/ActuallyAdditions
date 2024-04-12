@@ -10,18 +10,22 @@
 
 package de.ellpeck.actuallyadditions.api.laser;
 
+import com.google.common.collect.ImmutableSet;
+import de.ellpeck.actuallyadditions.api.ActuallyAdditionsAPI;
 import de.ellpeck.actuallyadditions.mod.misc.apiimpl.ConnectionPair;
-import io.netty.util.internal.ConcurrentSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
+import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class Network implements INetwork {
 
-    public final Set<IConnectionPair> connections = new ConcurrentSet<>();
+    public final Set<IConnectionPair> connections = Collections.synchronizedSet(new ObjectOpenHashSet<>());
     public int changeAmount;
 
     @Override
@@ -30,11 +34,49 @@ public class Network implements INetwork {
         this.incrementChangeAmount();
     }
     
+    /**
+     * @return Nothing because we don't do anything and instead force the connection handler to take care of it
+     */
     @Override
-    public boolean removeConnection(IConnectionPair pair) {
+    public Pair<Set<INetwork>, Set<BlockPos>> removeConnection(IConnectionPair toRemove, World world) {
         this.incrementChangeAmount();
-        return this.connections.remove(pair);
+        
+        if (this.connections.remove(toRemove)) {
+            shitTheBed(world);
+        }
+        
+        return null;
     }
+    
+    /**
+     * @return Nothing because we don't do anything and instead force the connection handler to take care of it
+     */
+    @Override
+    public Pair<Set<INetwork>, Set<BlockPos>> removeRelay(BlockPos relayPos, World world) {
+        this.incrementChangeAmount();
+        
+        this.connections.removeIf(pair -> pair.contains(relayPos));
+        
+        shitTheBed(world);
+        
+        return null;
+    }
+    
+    /**
+     * go insane and remove all of our connections, remove ourselves from the world, and freak out because we don't know where our own connections lead
+     */
+    private void shitTheBed(World world) {
+        ActuallyAdditionsAPI.connectionHandler.removeNetwork(this, world);
+        
+        for (IConnectionPair pair : this.connections) {
+            ActuallyAdditionsAPI.connectionHandler.addConnection(pair.getPositions()[0], pair.getPositions()[1], pair.getType(), world, pair.doesSuppressRender());
+        }
+    }
+    
+    public void absorbNetwork(INetwork other) {
+        this.connections.addAll(other.getAllConnections());
+    }
+    
     
     @Override
     public Set<IConnectionPair> getAllConnections() {
@@ -45,7 +87,17 @@ public class Network implements INetwork {
     public Set<IConnectionPair> getConnectionsFor(BlockPos pos) {
         return connections.stream()
                           .filter(pair -> pair.contains(pos))
-                          .collect(Collectors.toSet());
+                          .collect(ImmutableSet.toImmutableSet());
+    }
+    
+    @Override
+    public boolean containsRelay(BlockPos pos) {
+        for (IConnectionPair pair : this.connections) {
+            if (pair.contains(pos)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     @Override
@@ -72,7 +124,7 @@ public class Network implements INetwork {
         if (!(obj instanceof Network))
             return false;
         
-        return this.getAllConnections().equals(((Network) obj).getAllConnections());
+        return this.getAllConnections().equals(((INetwork) obj).getAllConnections());
     }
     
     @Override
