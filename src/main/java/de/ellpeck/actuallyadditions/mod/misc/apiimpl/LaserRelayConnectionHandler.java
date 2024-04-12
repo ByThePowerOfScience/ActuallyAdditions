@@ -10,6 +10,7 @@
 
 package de.ellpeck.actuallyadditions.mod.misc.apiimpl;
 
+import com.google.common.collect.ImmutableSet;
 import de.ellpeck.actuallyadditions.api.laser.IConnectionPair;
 import de.ellpeck.actuallyadditions.api.laser.ILaserRelayConnectionHandler;
 import de.ellpeck.actuallyadditions.api.laser.INetwork;
@@ -44,9 +45,12 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
      * Merges two laserRelayNetworks together
      * (Actually puts everything from the second network into the first one and removes the second one)
      */
-    private static void mergeNetworks(INetwork firstNetwork, INetwork secondNetwork, World world) {
-        firstNetwork.absorbNetwork(secondNetwork); // TODO use mergeInto method
+    private void mergeNetworks(INetwork firstNetwork, INetwork secondNetwork, World world) {
+        firstNetwork.absorbNetwork(secondNetwork);
         secondNetwork.incrementChangeAmount();
+        
+        secondNetwork.getMembers()
+                     .forEach(pos -> networkLookupMap.put(pos, firstNetwork));
         
         WorldData data = WorldData.get(world);
         data.removeNetwork(secondNetwork);
@@ -62,35 +66,48 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
      */
     @Override
     public Set<IConnectionPair> getConnectionsFor(BlockPos relay, World world) {
-        return getNetworkFor(relay, world).getConnectionsFor(relay);
+        INetwork networkFor = getNetworkFor(relay, world);
+        if (networkFor != null) {
+            return networkFor.getConnectionsFor(relay);
+        } else {
+            return ImmutableSet.of();
+        }
     }
 
     /**
      * Removes a Relay from its Network
      */
     @Override
-    public void removeRelayFromNetwork(BlockPos relay, World world) {
-        INetwork networkFor = this.getNetworkFor(relay, world);
+    public void removeRelayFromNetwork(BlockPos relayPos, World world) {
+        INetwork networkFor = this.getNetworkFor(relayPos, world);
         
-        Pair<Set<INetwork>, Set<BlockPos>> newNetworksAndIsolatedNodes = networkFor.removeRelay(relay, world);
-        
-        if (newNetworksAndIsolatedNodes == null)
+        if (networkFor == null)
             return;
         
-        WorldData data = WorldData.get(world);
+        Pair<Set<INetwork>, Set<BlockPos>> newNetworks_orphanedNodes = networkFor.removeRelay(relayPos, world);
         
-        if (!newNetworksAndIsolatedNodes.getLeft().isEmpty()) {
-            newNetworksAndIsolatedNodes.getLeft().forEach(data::registerNetwork);
+        networkLookupMap.remove(relayPos);
+        
+        if (newNetworks_orphanedNodes == null)
+            return;
+        
+        
+        Set<INetwork> newNetworks = newNetworks_orphanedNodes.getLeft();
+        if (!newNetworks.isEmpty()) {
+            handleNewNetworks(newNetworks, world);
         }
-        if (!newNetworksAndIsolatedNodes.getRight().isEmpty()) {
-            // TODO remove the isolated nodes from the reference map
+        
+        Set<BlockPos> orphanedNodes = newNetworks_orphanedNodes.getRight();
+        if (!orphanedNodes.isEmpty()) {
+            handleOrphanedNodes(orphanedNodes);
         }
     }
     
     @Override
     public void removeNetwork(INetwork network, World world) {
         WorldData.get(world).removeNetwork(network);
-        // TODO remove all network members in map
+        
+        network.getMembers().forEach(networkLookupMap::remove);
     }
     
     /**
@@ -121,8 +138,9 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
     @Override
     public boolean addConnection(BlockPos firstRelay, BlockPos secondRelay, LaserType type, World world, boolean suppressConnectionRender, boolean removeIfConnected) {
         if (firstRelay == null
-        || secondRelay == null
-        || Objects.equals(firstRelay, secondRelay)) {
+            || secondRelay == null
+            || Objects.equals(firstRelay, secondRelay)
+        ) {
             return false;
         }
         
@@ -134,9 +152,9 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
         //No Network exists
         if (firstNetwork == null && secondNetwork == null) {
             firstNetwork = new Network();
-            WorldData.get(world).registerNetwork(firstNetwork);
-            
             firstNetwork.addConnection(newPair);
+            networkLookupMap.put(firstRelay, firstNetwork);
+            WorldData.get(world).registerNetwork(firstNetwork);
         }
         //The same Network
         else if (firstNetwork == secondNetwork) {
@@ -149,16 +167,18 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
         }
         //Both relays have laserRelayNetworks
         else if (firstNetwork != null && secondNetwork != null) {
-            firstNetwork.absorbNetwork(secondNetwork);
+            mergeNetworks(firstNetwork, secondNetwork, world);
             firstNetwork.addConnection(newPair);
         }
         //Only first network exists
         else if (firstNetwork != null) {
             firstNetwork.addConnection(newPair);
+            networkLookupMap.put(secondRelay, firstNetwork);
         }
         //Only second network exists
         else {
             secondNetwork.addConnection(newPair);
+            networkLookupMap.put(firstRelay, secondNetwork);
         }
         //System.out.println("Connected "+firstRelay.toString()+" to "+secondRelay.toString());
         //System.out.println(firstNetwork == null ? secondNetwork.toString() : firstNetwork.toString());
@@ -173,12 +193,27 @@ public final class LaserRelayConnectionHandler implements ILaserRelayConnectionH
             INetwork network = this.getNetworkFor(firstRelay, world);
 
             if (network != null) {
-                network.removeConnection(firstRelay, secondRelay, world);
+                Pair<Set<INetwork>, Set<BlockPos>> newNetworks_orphanedNodes = network.removeConnection(firstRelay, secondRelay, world);
+                if (newNetworks_orphanedNodes != null) {
+                    handleOrphanedNodes(newNetworks_orphanedNodes.getRight());
+                    handleNewNetworks(newNetworks_orphanedNodes.getLeft(), world);
+                }
+                
                 WorldData.get(world).markDirty();
             }
         }
     }
+    
+    private void handleNewNetworks(Set<INetwork> newNetworks, World world) {
+        WorldData data = WorldData.get(world);
+        newNetworks.forEach(data::registerNetwork);
+    }
+    
+    private void handleOrphanedNodes(Set<BlockPos> orphanedNodes) {
+        orphanedNodes.forEach(networkLookupMap::remove);
+    }
 
+    
     @Override
     public LaserType getTypeFromLaser(TileEntity tile) {
         if (tile instanceof TileEntityLaserRelay) {

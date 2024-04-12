@@ -20,7 +20,6 @@ public interface INetwork extends INBTSerializable<NBTTagCompound> {
 	/**
 	 * Removes a connection between two positions.
 	 * <p>Any nodes that are disconnected from this network after the change will be removed from this network.
-	 * @param pair Object holding the positions of the relays to disconnect.
 	 * @param world A reference to the world. Likely unneeded.
 	 * @return Pair of (or null if no change):
 	 *      <p>Left: Set of new networks that have been created by this change, if any.
@@ -54,6 +53,8 @@ public interface INetwork extends INBTSerializable<NBTTagCompound> {
 	Set<IConnectionPair> getAllConnections();
 	
 	Set<IConnectionPair> getConnectionsFor(BlockPos pos);
+	
+	Set<BlockPos> getMembers();
 	
 	/**
 	 * Absorb another network into this.

@@ -20,6 +20,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.apache.commons.lang3.tuple.Pair;
 
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.Set;
 
@@ -34,6 +35,12 @@ public class Network implements INetwork {
         this.incrementChangeAmount();
     }
     
+    @Nullable
+    @Override
+    public Pair<Set<INetwork>, Set<BlockPos>> removeConnection(BlockPos first, BlockPos second, World world) {
+        return removeConnection(new ConnectionPair(first, second, this.connections.iterator().next().getType(), false), world);
+    }
+    
     /**
      * @return Nothing because we don't do anything and instead force the connection handler to take care of it
      */
@@ -42,7 +49,7 @@ public class Network implements INetwork {
         this.incrementChangeAmount();
         
         if (this.connections.remove(toRemove)) {
-            shitTheBed(world);
+            updateViaConnectionHandler(world);
         }
         
         return null;
@@ -57,15 +64,15 @@ public class Network implements INetwork {
         
         this.connections.removeIf(pair -> pair.contains(relayPos));
         
-        shitTheBed(world);
+        updateViaConnectionHandler(world);
         
         return null;
     }
     
     /**
-     * go insane and remove all of our connections, remove ourselves from the world, and freak out because we don't know where our own connections lead
+     * Use the connection handler to handle our changes
      */
-    private void shitTheBed(World world) {
+    private void updateViaConnectionHandler(World world) {
         ActuallyAdditionsAPI.connectionHandler.removeNetwork(this, world);
         
         for (IConnectionPair pair : this.connections) {
@@ -88,6 +95,17 @@ public class Network implements INetwork {
         return connections.stream()
                           .filter(pair -> pair.contains(pos))
                           .collect(ImmutableSet.toImmutableSet());
+    }
+    
+    @Override
+    public Set<BlockPos> getMembers() {
+        Set<BlockPos> ret = new ObjectOpenHashSet<>(this.connections.size() * 2);
+        this.getAllConnections().forEach(pair -> {
+            BlockPos[] positions = pair.getPositions();
+            ret.add(positions[0]);
+            ret.add(positions[1]);
+        });
+        return ret;
     }
     
     @Override

@@ -204,6 +204,10 @@ public class GraphNetwork implements INetwork {
 		return nodeLookupMap.get(pos);
 	}
 	
+	@Override
+	public Set<BlockPos> getMembers() {
+		return nodeLookupMap.keySet();
+	}
 	
 	/**
 	 * Performs an action on every node in the graph. Used in {@link #absorbNetwork(de.ellpeck.actuallyadditions.api.laser.INetwork)} to set every node's network reference to the new network.

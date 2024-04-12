@@ -14,6 +14,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import javax.annotation.Nullable;
 import java.util.Set;
 
 /**
@@ -30,6 +31,7 @@ public interface ILaserRelayConnectionHandler {
 
     void removeRelayFromNetwork(BlockPos relay, World world);
 
+    @Nullable
     INetwork getNetworkFor(BlockPos relay, World world);
 
     boolean addConnection(BlockPos firstRelay, BlockPos secondRelay, LaserType type, World world);
